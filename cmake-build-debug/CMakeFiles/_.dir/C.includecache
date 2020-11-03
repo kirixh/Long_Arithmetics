@@ -1,0 +1,16 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/bn.h
+
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/main.c
+bn.h
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/bn.h
+stdio.h
+-
+

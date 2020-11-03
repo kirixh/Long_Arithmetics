@@ -1,0 +1,3 @@
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/kika/Рабочая папка/Cpp файлы/разное/Проект С/cmake-build-debug/CMakeFiles/_.dir

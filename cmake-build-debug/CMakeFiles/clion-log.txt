@@ -1,0 +1,4 @@
+/snap/clion/129/bin/cmake/linux/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=/bin/g++ -G "CodeBlocks - Unix Makefiles" "/home/kika/Рабочая папка/Cpp файлы/разное/Проект С"
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/kika/Рабочая папка/Cpp файлы/разное/Проект С/cmake-build-debug
