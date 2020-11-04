@@ -30,12 +30,25 @@ bn *bn_init(bn const *orig){
     if (r==NULL) return NULL;
     r->bodysize=orig->bodysize;
     r->sign=orig->sign;
-    r->body=orig->body;
+    r->body=malloc(sizeof(int) * r->bodysize);
+    if (r->body == NULL){
+        free(r);
+        return NULL;
+    }
+    for (int i=0;i<r->bodysize;i++){
+        r->body[i]=orig->body[i];
+    }
+    return r;
+}
+int bn_delete(bn *t){
+    if (t==NULL) return BN_NULL_OBJECT;
+    free(t->body);
+    free(t);
 }
 //Вывести на экран значение BN
 void bn_print(bn const *num){
     if (num->sign == -1) putchar('-');
-    for(int i=0; i<num->bodysize;i++){
+    for(int i=num->bodysize-1; i>=0;i--){
         putchar(num->body[i]+48);
     }
     putchar('\n');
@@ -44,59 +57,24 @@ void bn_print(bn const *num){
 int bn_init_string(bn *t, const char *init_string){
     if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;
     char a=init_string[0];
-    int flag=0; // флажок, нужен чтобы обрабатывать по-разному положительные и отрицательные числа.
-    int fl=1; // еще флажок, та же причина
-    if (a=='-'){t->sign = -1;a=init_string[1];flag=1;}
-    else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}//если 0 то всё BN=0
+    int flag=0; /// флажок, нужен чтобы обрабатывать по-разному положительные и отрицательные числа.
+    int len = -1; /// счётчик длины
+    if (a=='-'){t->sign = -1;len++;flag=1;}
+    else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
     else {t->sign = 1;}
-    int len = 1; //счётчик длины
-    while (a){
-        if(flag){ //если отрицательное
-            t->body[0]=a-48;
-            flag=0;
-            a = init_string[2];
-            fl=0;
-        }
-        else {
-            len++;
-            t->body = realloc(t->body, (len) * sizeof(int)); //дозакаываем память
-            if (t->body == NULL) return BN_NO_MEMORY;
-            t->body[len-1-fl] = a - 48;
-            a = init_string[len+1-2*fl];
-        }
+    while (a){a=init_string[len+1];len++;} ///Считаем длину числа
+    int i =0;
+    if (flag) {i =1;len--;} /// если отрицательное
+    t->bodysize = len;
+    t->body = malloc((len) * sizeof(int)); ///закаываем память
+    if (t->body == NULL) return BN_NO_MEMORY;
+    for (i; i<len+flag;i++){
+        a = init_string[i];
+        t->body[i-flag] = a - 48;
     }
-    if (fl) //если отрицательное
-        t->bodysize = len-1;
-    else
-        t->bodysize = len;
-    return BN_OK;
-}
-// Инициализировать значение BN заданным целым числом
-int bn_init_int(bn *t, int init_int){
-    if (t==NULL) return BN_NULL_OBJECT;
-    if (init_int==0){ //если 0 то всё BN=0
-        t->bodysize=1;
-        t->sign=0;
-        t->body[0]=0;
-        return BN_OK;
-    }
-    if (init_int>0) t->sign = 1;
-    else {t->sign = -1; init_int*=-1;} // если отрицательное то привращаем в положительное
-    int a=init_int%10; // получаем последнюю цифру
-    int len = 1;
-    while (init_int){
-        t->body=realloc(t->body,len*sizeof(int));//дозаказываем память
-        if (t->body == NULL) return BN_NO_MEMORY;
-        t->body[len-1]=a;
-        init_int/=10;
-        a=init_int%10;
-        len++;
-    }
-    len--; // len всегда на 1 больше чем длина числа
-    t->bodysize=len;
     int tmp;
-    init_int = len/2; // используем отслужившую переменную
-    for(int j=0;j<init_int;j++){ //меняем местами цифры, так как они записаны в обратном порядке
+    i=len/2; /// используем старую переменную
+    for(int j=0;j<i;j++){ ///меняем местами цифры, так как они записаны в прямом порядке
         tmp=t->body[len-1];
         t->body[len-1]=t->body[j];
         t->body[j]=tmp;
@@ -105,11 +83,37 @@ int bn_init_int(bn *t, int init_int){
     return BN_OK;
 
 }
-int bn_sign(bn const *t){ //-1 если t<0; 0 если t = 0, 1 если t>0
+// Инициализировать значение BN заданным целым числом
+int bn_init_int(bn *t, int init_int){
+    if (t==NULL) return BN_NULL_OBJECT;
+    if (init_int==0){ ///если 0 то всё BN=0
+        t->bodysize=1;
+        t->sign=0;
+        t->body[0]=0;
+        return BN_OK;
+    }
+    if (init_int>0) t->sign = 1;
+    else {t->sign = -1; init_int*=-1;} /// если отрицательное то привращаем в положительное
+    int a=init_int%10; /// получаем последнюю цифру
+    int len = 1;
+    while (init_int){
+        t->body=realloc(t->body,len*sizeof(int)); ///дозаказываем память
+        if (t->body == NULL) return BN_NO_MEMORY;
+        t->body[len-1]=a;
+        init_int/=10;
+        a=init_int%10;
+        len++;
+    }
+    len--; /// len всегда на 1 больше чем длина числа
+    t->bodysize=len;
+    return BN_OK;
+
+}
+int bn_sign(bn const *t){ ///-1 если t<0; 0 если t = 0, 1 если t>0
     if (t==NULL) return BN_NULL_OBJECT;
     return t->sign;
 }
-int bn_abs(bn *t){ //взять модуль
+int bn_abs(bn *t){ ///взять модуль
     if (t==NULL) return BN_NULL_OBJECT;
     if (t->sign==-1) t->sign = 1;
     return BN_OK;
@@ -119,7 +123,7 @@ int bn_neg(bn *t){
     t->sign *=-1;
     return BN_OK;
 }
-int bn_cmp(bn const *left, bn const *right){ // Если левое меньше, вернуть <0; если равны, вернуть 0; иначе >0
+int bn_cmp(bn const *left, bn const *right){ /// Если левое меньше, вернуть <0; если равны, вернуть 0; иначе >0
     if (left==NULL || right == NULL) return BN_NULL_OBJECT;
     int ret = 1;
     if (left->sign > right->sign) return 1;
@@ -129,7 +133,7 @@ int bn_cmp(bn const *left, bn const *right){ // Если левое меньше
         if (left->sign==-1) ret=-1;
         if (left->bodysize > right->bodysize) return ret;
         if (left->bodysize < right->bodysize) return -ret;
-        for (int i=0;i<left->bodysize;i++){
+        for (int i=left->bodysize-1;i>0;i--){
             if (left->body[i] > right->body[i]) return ret;
             if (left->body[i] < right->body[i]) return -ret;
         }
@@ -138,31 +142,111 @@ int bn_cmp(bn const *left, bn const *right){ // Если левое меньше
 }
 
 int bn_mul_small (bn *t, const long long int n){
-    char * ans = "";
-    long long int buff =0;
-    long long j = 0 ;
- for (int i = t->bodysize;i>0;i--){
+    if (t==NULL) return BN_NULL_OBJECT;
+    if (n==0) { ///Если n=0 то bn=0
+        t->bodysize=1;
+        t->sign=0;
+        t->body[0]=0;
+        return BN_OK;
+    }
+    long long int buff =0; /// будем хранить остаток
+    long long int j = 0 ;
+ for (int i = 0;i<t->bodysize;i++){
      j=t->body[i]*n;
+     t->body[i]=(buff + j)%10;
+     buff = (buff+j)/10;
  }
+ if (buff){
+     int reall_size=4; /// для того чтобы дозаказывать память постепенно
+     t->body=realloc(t->body,(reall_size+t->bodysize) * sizeof(int)); ///дозаказываем память
+     if (t->body == NULL) return BN_NO_MEMORY;
+     int i = 1;
+     while(buff){ ///если длина произведения больше чем у t
+         if (i==reall_size){
+             reall_size*=2;
+             i=1;
+             t->body=realloc(t->body,(reall_size+t->bodysize)*sizeof(int)); ///дозаказываем память
+             if (t->body == NULL) return BN_NO_MEMORY;
+         }
+         t->body[t->bodysize]=buff%10;
+         t->bodysize++;
+         buff/=10;
+         i++;
+     }
+ }
+ return BN_OK;
 }
-
-int bn_init_string_radix(bn *t, const char *init_string, int radix){ // Инициализировать значение BN представлением строки
-char * p="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";// в системе счисления radix
+bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одного знака
+    if (left == NULL || right == NULL) return NULL;
+    bn *res = bn_new(); ///создаем новое bn
+    int flag =0; ///флаг, нужен для определения числа большей длины
+    if (left->sign)
+        res->sign = left->sign;
+    else
+        res->sign = right->sign;
+    if (left->bodysize > right->bodysize){
+        res->bodysize=left->bodysize;
+        flag=1;
+    }
+    else
+        res->bodysize=right->bodysize;
+    res->body=malloc((res->bodysize+1)*sizeof(int)); ///выделяем память
+    int j = 0; ///счетчик в котором будет то что мы "откладываем в уме"
+    if (flag){
+        for (int i = 0;i<left->bodysize;i++){
+            if (i<right->bodysize) ///если меньше меньшего, то прибаляем цифры обоих чисел
+                j+=left->body[i]+right->body[i];
+            else ///иначе только большего
+                j+=left->body[i];
+            res->body[i]=j%10;
+            j/=10;
+        }
+        if (j){
+            res->body[left->bodysize]=j;
+            res->bodysize++;
+        }
+    }
+    else{ ///аналогично, но когда правое больше или равно левому
+        for (int i = 0;i<right->bodysize;i++){
+            if (i<left->bodysize)
+                j= j+ left->body[i]+right->body[i];
+            else
+                j= j+ right->body[i];
+            res->body[i]=j%10;
+            j/=10;
+        }
+        if (j){
+            res->body[right->bodysize]=j;
+            res->bodysize++;
+        }
+    }
+    return res;
+}
+int bn_init_string_radix(bn *t, const char *init_string, int radix){ /// Инициализировать значение BN представлением строки
+char * numeral_sys="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"; /// в системе счисления radix
 if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;
 char a = init_string[0];
 int i =0;
-int sum=0;
-int flag =1; // для того чтобы потом инициализировать от отрицательного int
-if (a=='-') {flag = -1;i =1;}
+bn *sum=bn_new();
+if (a=='-') {t->sign=-1;i =1;}
+else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
 while (a){
     a=init_string[i];
     if (a=='\0') break;
     int k=0;
-    for (k;k<32;k++){ // находим номер цифры в строке p
-        if (p[k]==a) break;
+    for (k;k<32;k++){ /// находим номер цифры в строке p
+        if (numeral_sys[k]==a) break;
     }
-    sum=sum*radix + k;
+    int p = bn_mul_small(sum,radix);
+    if (p) return p;
+    bn *g = bn_new();
+    p= bn_init_int(g,k);
+    if (p) return p;
+    sum = bn_add_sign(sum,g);
+    bn_delete(g);
     i++;
 }
-return bn_init_int(t,flag*sum);
+t = bn_init(sum);
+int p =bn_delete(sum);
+return p;
 }
