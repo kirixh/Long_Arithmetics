@@ -20,5 +20,7 @@ int bn_sign(bn const *t); //-1 если t<0; 0 если t = 0, 1 если t>0
 int bn_abs(bn *t);
 int bn_neg(bn *t);
 int bn_cmp(bn const *left, bn const *right);
-int bn_init_string_radix(bn *t, const char *init_string, int radix); // Инициали(ироват+ (начение BN представлением строки
-// в системе счислени: radix
+int bn_init_string_radix(bn *t, const char *init_string, int radix); // Инициализировать значение BN представлением строки в системе счисления radix
+int bn_mul_small (bn *t, const int n); // Умножение на короткое число
+bn* bn_add_sign(bn const *left, bn const *right); // Сложение BN одного знака
+int bn_delete(bn *t); // отчистить память

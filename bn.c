@@ -44,6 +44,7 @@ int bn_delete(bn *t){
     if (t==NULL) return BN_NULL_OBJECT;
     free(t->body);
     free(t);
+    return BN_OK;
 }
 //Вывести на экран значение BN
 void bn_print(bn const *num){
@@ -66,11 +67,12 @@ int bn_init_string(bn *t, const char *init_string){
     int i =0;
     if (flag) {i =1;len--;} /// если отрицательное
     t->bodysize = len;
-    t->body = malloc((len) * sizeof(int)); ///закаываем память
+    t->body = realloc(t->body,(len) * sizeof(int)); ///закаываем память
     if (t->body == NULL) return BN_NO_MEMORY;
-    for (i; i<len+flag;i++){
+    while(i<len+flag){
         a = init_string[i];
         t->body[i-flag] = a - 48;
+        i++;
     }
     int tmp;
     i=len/2; /// используем старую переменную
@@ -137,11 +139,11 @@ int bn_cmp(bn const *left, bn const *right){ /// Если левое меньш�
             if (left->body[i] > right->body[i]) return ret;
             if (left->body[i] < right->body[i]) return -ret;
         }
-        return 0;
     }
+    return 0;
 }
 
-int bn_mul_small (bn *t, const long long int n){
+int bn_mul_small (bn *t, const int n){
     if (t==NULL) return BN_NULL_OBJECT;
     if (n==0) { ///Если n=0 то bn=0
         t->bodysize=1;
@@ -149,8 +151,8 @@ int bn_mul_small (bn *t, const long long int n){
         t->body[0]=0;
         return BN_OK;
     }
-    long long int buff =0; /// будем хранить остаток
-    long long int j = 0 ;
+    int buff =0; /// будем хранить остаток
+    int j;
  for (int i = 0;i<t->bodysize;i++){
      j=t->body[i]*n;
      t->body[i]=(buff + j)%10;
@@ -190,7 +192,8 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
     }
     else
         res->bodysize=right->bodysize;
-    res->body=malloc((res->bodysize+1)*sizeof(int)); ///выделяем память
+    res->body=realloc(res->body,(res->bodysize+1)*sizeof(int)); ///выделяем память
+    if (res->body == NULL) return NULL;
     int j = 0; ///счетчик в котором будет то что мы "откладываем в уме"
     if (flag){
         for (int i = 0;i<left->bodysize;i++){
@@ -234,19 +237,31 @@ while (a){
     a=init_string[i];
     if (a=='\0') break;
     int k=0;
-    for (k;k<32;k++){ /// находим номер цифры в строке p
+    while (k<32){ /// находим номер цифры в строке p
         if (numeral_sys[k]==a) break;
+        k++;
     }
-    int p = bn_mul_small(sum,radix);
-    if (p) return p;
+    bn_mul_small(sum,radix);
     bn *g = bn_new();
-    p= bn_init_int(g,k);
-    if (p) return p;
-    sum = bn_add_sign(sum,g);
+    bn_init_int(g,k);
+    bn *res = bn_add_sign(sum,g);
+    bn_delete(sum);
+    sum=bn_init(res);
+    bn_delete(res);
     bn_delete(g);
     i++;
 }
-t = bn_init(sum);
-int p =bn_delete(sum);
-return p;
+t->sign=sum->sign;
+t->bodysize=sum->bodysize;
+t->body=realloc(t->body,sizeof(int) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return NULL;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=sum->body[i];
+    }
+//if (t){} ///костыль от предупреждения unused variable
+bn_delete(sum);
+return BN_OK;
 }
