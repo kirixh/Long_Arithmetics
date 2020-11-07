@@ -1,7 +1,8 @@
-#include "bn.h"
+//#include "bn.h"
 #include <stdio.h>
 #include <stdlib.h>
-/*#include <time.h>
+#include <string.h>
+//#include <time.h>
 struct bn_s {
     int *body;
     int bodysize;
@@ -26,7 +27,7 @@ bn *bn_new(){
     return r;
 }
 
-int bn_init_int(bn *t, int init_int){
+/*int bn_init_int(bn *t, int init_int){
     if (t==NULL) return BN_NULL_OBJECT;
     if (init_int==0){ ///если 0 то всё BN=0
         t->bodysize=1;
@@ -50,7 +51,7 @@ int bn_init_int(bn *t, int init_int){
     t->bodysize=len;
     return BN_OK;
 
-}
+}*/
 
 bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одного знака
     if (left == NULL || right == NULL) return NULL;
@@ -130,7 +131,7 @@ void bn_print(bn const *num){
     putchar('\n');
 }
 
-int main() {
+/*int main() {
     int n;
     scanf("%d",&n);
     bn *a=bn_new();
@@ -160,16 +161,179 @@ int main() {
     return 0;
 }*/
 
+int bn_init_string(bn *t, const char *init_string){
+    if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;
+    char a=init_string[0];
+    int flag=0; /// флажок, нужен чтобы обрабатывать по-разному положительные и отрицательные числа.
+    int len = -1; /// счётчик длины
+    if (a=='-'){t->sign = -1;len++;flag=1;}
+    else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
+    else {t->sign = 1;}
+    while (a){a=init_string[len+1];len++;} ///Считаем длину числа
+    int i =0;
+    if (flag) {i =1;len--;} /// если отрицательное
+    t->bodysize = len;
+    t->body = realloc(t->body,(len) * sizeof(int)); ///закаываем память
+    if (t->body == NULL) return BN_NO_MEMORY;
+    while(i<len+flag){
+        a = init_string[i];
+        t->body[i-flag] = a - 48;
+        i++;
+    }
+    int tmp;
+    i=len/2; /// используем старую переменную
+    for(int j=0;j<i;j++){ ///меняем местами цифры, так как они записаны в прямом порядке
+        tmp=t->body[len-1];
+        t->body[len-1]=t->body[j];
+        t->body[j]=tmp;
+        len--;
+    }
+    return BN_OK;
+
+}
+
+int bn_cmp_abs(bn const *left, bn const *right){ /// Сравнение по модулю
+    if (left==NULL || right == NULL) return BN_NULL_OBJECT;
+    int ret = 1;
+    if (left->sign==0 && right->sign==0) return 0;
+    if (right->sign==0) return ret;
+    if (left->sign==0) return -ret;
+    if (left->bodysize > right->bodysize) return ret;
+    if (left->bodysize < right->bodysize) return -ret;
+    for (int i=left->bodysize-1;i>=0;i--){
+        if (left->body[i] > right->body[i]) return ret;
+        if (left->body[i] < right->body[i]) return -ret;
+    }
+    return 0;
+}
+
+bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN одного знака left - right
+    if (left == NULL || right == NULL) return NULL;
+    int flag = bn_cmp_abs(left, right);
+    bn *res = bn_new();
+    if (flag == 0) return res; /// если числа равны то разность 0
+    if (left->sign)
+        res->sign = left->sign;
+    else
+        res->sign = right->sign;
+    int reall_size = 4;                                              /// для того чтобы дозаказывать память постепенно
+    res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+    if (res->body == NULL) return NULL;
+    int j;                                                          ///счетчик в котором храним то что занимаем на предыдущем шаге
+    for (int i = 0; i < left->bodysize; i++) {
+        res->bodysize++;
+        if (i < right->bodysize) {                                     ///если меньше меньшего, то отнимаем цифры обоих чисел
+            j = left->body[i] - right->body[i];
+        } else                                                          ///иначе в ответ идут цифры большего
+            j = left->body[i];
+        if (i == reall_size - 1) {                                  /// если массив переполнился
+            reall_size *= 2;
+            res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+            if (res->body == NULL) return NULL;
+        }
+        if (j < 0) { /// занимаем у старшего разряда
+            left->body[i + 1]--;
+            j += 10;
+        }
+        res->body[i] = j;
+    }
+    res->bodysize--;
+    while (res->body[res->bodysize - 1] == 0) ///убираем незначащие нули
+        res->bodysize--;
+
+    return res;
+}
+
+bn* bn_add(bn const *left, bn const *right){
+    if (left == NULL || right == NULL) return NULL;
+    if (left->sign==right->sign){
+        return bn_add_sign(left,right);
+    }
+    else{
+        int k = bn_cmp_abs(left,right);
+        if (k==1)
+            return bn_sub_sign(left,right);
+        else if (k==0)
+            return bn_new();
+        else
+            return bn_sub_sign(right,left);
+    }
+}
+bn* bn_sub(bn const *left, bn const *right){
+    if (left == NULL || right == NULL) return NULL;
+    int cmp_abs = bn_cmp_abs(left,right);
+    if (left->sign==right->sign){
+        if (cmp_abs==1) return bn_sub_sign(left,right);
+        else if (cmp_abs==0) return bn_new();
+        else {
+            bn *res = bn_sub_sign(right,left);
+            res->sign*=-1;
+            return res;
+        }
+    }
+    else if (left->sign>right->sign){ /// 1 : 0 ; 1 : -1; 0 : -1 .
+        bn *res = bn_add_sign(left,right);
+        if (left->sign==0) res->sign*=-1;
+        return res;
+    }
+    else { /// -1 : 0 ; -1 : 1; 0 : 1 .
+        bn * res = bn_add_sign(left,right);
+        if (left->sign==0) res->sign*=-1;
+        return res;
+    }
+}
+
+char *getstring(int *len){
+    *len=0;
+    int real_num=1;
+    char * init_string1 = (char *)malloc(1);
+    char a=getchar();
+    while (a!='\n'){
+        init_string1[(*len)++]=a;
+        if (*len>=real_num){
+            real_num*=2;
+            init_string1=(char *)realloc(init_string1,real_num);
+        }
+        a=getchar();
+    }
+    init_string1[*len]='\0';
+    return init_string1;
+}
+int main(){ ///Длинное слож/вычитание
+    int len;
+    char *init_string1=getstring(&len);
+    char *oper=getstring(&len);
+    char *init_string2=getstring(&len);
+    bn *a=bn_new();
+    bn *b=bn_new();
+    bn *c=bn_new();
+    bn_init_string(a,init_string1);
+    bn_init_string(b,init_string2);
+    if (oper[0]=='+'){
+        bn_delete(c);
+        c=bn_add(a,b);}
+    else{
+        bn_delete(c);
+        c=bn_sub(a,b);}
+    bn_print(c);
+    bn_delete(c);
+    bn_delete(a);
+    bn_delete(b);
+    free (init_string1);
+    free (oper);
+    free (init_string2);
+    return 0;
+}
 
 
-int main(){
+/*int main(){
     bn *a = bn_new();
     bn *b = bn_new();
     //bn *c = bn_new();
     //printf("%d ", 7%10);
-    bn_init_string(a,"-1");
+    bn_init_string(a,"0");
     //char* init_string = "SUKABLYATNAHUI";
-    int code = bn_init_int(b,0);
+    int code = bn_init_int(b,1);
     //bn *c=bn_init(b);
     //int code = bn_init_string(a,init_string);
     //code = bn_init_int(b,0);
@@ -181,7 +345,7 @@ int main(){
     //bn_print(c);
     bn_print(b);
     printf("сравнили %d \n",bn_cmp_abs(a,b));
-    bn *c = bn_add(a,b);
+    bn *c = bn_sub(a,b);
     bn_print(c);
     //code = bn_cmp(a,b);
     printf("cmp ret %d \n",code);
@@ -189,4 +353,4 @@ int main(){
     bn_delete(b);
     bn_delete(c);
     return 0;
-}
+}*/

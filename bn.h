@@ -27,3 +27,4 @@ bn* bn_add_sign(bn const *left, bn const *right); // Сложение BN одн�
 bn* bn_sub_sign(bn const *left, bn const *right); // Вычитание одного знака
 int bn_delete(bn *t); // отчистить память
 bn* bn_add(bn const *left, bn const *right);// Сложение BN
+bn* bn_sub(bn const *left, bn const *right); //разность BN

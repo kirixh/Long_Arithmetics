@@ -1,6 +1,7 @@
 //
 // Created by kika on 23.10.2020.
 //
+/*
 #include <stdlib.h>
 #include <stdio.h>
 #include "bn.h"
@@ -135,7 +136,7 @@ int bn_cmp(bn const *left, bn const *right){ /// Если левое меньш�
         if (left->sign==-1) ret=-1;
         if (left->bodysize > right->bodysize) return ret;
         if (left->bodysize < right->bodysize) return -ret;
-        for (int i=left->bodysize-1;i>0;i--){
+        for (int i=left->bodysize-1;i>=0;i--){
             if (left->body[i] > right->body[i]) return ret;
             if (left->body[i] < right->body[i]) return -ret;
         }
@@ -151,7 +152,7 @@ int bn_cmp_abs(bn const *left, bn const *right){ /// Сравнение по м�
     if (left->sign==0) return -ret;
     if (left->bodysize > right->bodysize) return ret;
     if (left->bodysize < right->bodysize) return -ret;
-    for (int i=left->bodysize-1;i>0;i--){
+    for (int i=left->bodysize-1;i>=0;i--){
         if (left->body[i] > right->body[i]) return ret;
         if (left->body[i] < right->body[i]) return -ret;
         }
@@ -243,16 +244,6 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
 bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN одного знака left - right
     if (left == NULL || right == NULL) return NULL;
     int flag = bn_cmp_abs(left, right);
-    /*if (flag == -1) { ///если левое меньше правого то знак -
-        if (right->sign == -1) {
-            bn *res = bn_sub_sign(bn_abs(left), bn_abs(right));
-            res->sign = -1;
-            return res;
-        }
-        bn *res = bn_sub_sign(right, left);
-        res->sign = -1;
-        return res;
-    }*/
     bn *res = bn_new();
     if (flag == 0) return res; /// если числа равны то разность 0
     if (left->sign)
@@ -302,6 +293,29 @@ bn* bn_add(bn const *left, bn const *right){
             return bn_sub_sign(right,left);
     }
 }
+bn* bn_sub(bn const *left, bn const *right){
+    if (left == NULL || right == NULL) return NULL;
+    int cmp_abs = bn_cmp_abs(left,right);
+    if (left->sign==right->sign){
+        if (cmp_abs==1) return bn_sub_sign(left,right);
+        else if (cmp_abs==0) return bn_new();
+        else {
+            bn *res = bn_sub_sign(right,left);
+            res->sign*=-1;
+            return res;
+        }
+    }
+    else if (left->sign>right->sign){ /// 1 : 0 ; 1 : -1; 0 : -1 .
+        bn *res = bn_add_sign(left,right);
+        if (left->sign==0) res->sign*=-1;
+        return res;
+    }
+    else { /// -1 : 0 ; -1 : 1; 0 : 1 .
+        bn * res = bn_add_sign(left,right);
+        if (left->sign==0) res->sign*=-1;
+        return res;
+    }
+}
 /// Инициализировать значение BN представлением строки в системе счисления radix
 int bn_init_string_radix(bn *t, const char *init_string, int radix){
 if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;
@@ -341,3 +355,4 @@ t->body=realloc(t->body,sizeof(int) * t->bodysize);
 bn_delete(sum);
 return BN_OK;
 }
+*/
