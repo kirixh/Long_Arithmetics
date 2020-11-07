@@ -44,6 +44,7 @@ int bn_delete(bn *t){
     if (t==NULL) return BN_NULL_OBJECT;
     free(t->body);
     free(t);
+    return BN_OK;
 }
 //Вывести на экран значение BN
 void bn_print(bn const *num){
@@ -66,11 +67,12 @@ int bn_init_string(bn *t, const char *init_string){
     int i =0;
     if (flag) {i =1;len--;} /// если отрицательное
     t->bodysize = len;
-    t->body = malloc((len) * sizeof(int)); ///закаываем память
+    t->body = realloc(t->body,(len) * sizeof(int)); ///закаываем память
     if (t->body == NULL) return BN_NO_MEMORY;
-    for (i; i<len+flag;i++){
+    while(i<len+flag){
         a = init_string[i];
         t->body[i-flag] = a - 48;
+        i++;
     }
     int tmp;
     i=len/2; /// используем старую переменную
@@ -137,11 +139,26 @@ int bn_cmp(bn const *left, bn const *right){ /// Если левое меньш�
             if (left->body[i] > right->body[i]) return ret;
             if (left->body[i] < right->body[i]) return -ret;
         }
-        return 0;
     }
+    return 0;
 }
 
-int bn_mul_small (bn *t, const long long int n){
+int bn_cmp_abs(bn const *left, bn const *right){ /// Сравнение по модулю
+    if (left==NULL || right == NULL) return BN_NULL_OBJECT;
+    int ret = 1;
+    if (left->sign==0 && right->sign==0) return 0;
+    if (right->sign==0) return ret;
+    if (left->sign==0) return -ret;
+    if (left->bodysize > right->bodysize) return ret;
+    if (left->bodysize < right->bodysize) return -ret;
+    for (int i=left->bodysize-1;i>0;i--){
+        if (left->body[i] > right->body[i]) return ret;
+        if (left->body[i] < right->body[i]) return -ret;
+        }
+    return 0;
+}
+
+int bn_mul_small (bn *t, const int n){
     if (t==NULL) return BN_NULL_OBJECT;
     if (n==0) { ///Если n=0 то bn=0
         t->bodysize=1;
@@ -149,8 +166,8 @@ int bn_mul_small (bn *t, const long long int n){
         t->body[0]=0;
         return BN_OK;
     }
-    long long int buff =0; /// будем хранить остаток
-    long long int j = 0 ;
+    int buff =0; /// будем хранить остаток
+    int j;
  for (int i = 0;i<t->bodysize;i++){
      j=t->body[i]*n;
      t->body[i]=(buff + j)%10;
@@ -190,7 +207,8 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
     }
     else
         res->bodysize=right->bodysize;
-    res->body=malloc((res->bodysize+1)*sizeof(int)); ///выделяем память
+    res->body=realloc(res->body,(res->bodysize+1)*sizeof(int)); ///выделяем память
+    if (res->body == NULL) return NULL;
     int j = 0; ///счетчик в котором будет то что мы "откладываем в уме"
     if (flag){
         for (int i = 0;i<left->bodysize;i++){
@@ -222,8 +240,70 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
     }
     return res;
 }
-int bn_init_string_radix(bn *t, const char *init_string, int radix){ /// Инициализировать значение BN представлением строки
-char * numeral_sys="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"; /// в системе счисления radix
+bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN одного знака left - right
+    if (left == NULL || right == NULL) return NULL;
+    int flag = bn_cmp_abs(left, right);
+    /*if (flag == -1) { ///если левое меньше правого то знак -
+        if (right->sign == -1) {
+            bn *res = bn_sub_sign(bn_abs(left), bn_abs(right));
+            res->sign = -1;
+            return res;
+        }
+        bn *res = bn_sub_sign(right, left);
+        res->sign = -1;
+        return res;
+    }*/
+    bn *res = bn_new();
+    if (flag == 0) return res; /// если числа равны то разность 0
+    if (left->sign)
+        res->sign = left->sign;
+    else
+        res->sign = right->sign;
+    int reall_size = 4;                                              /// для того чтобы дозаказывать память постепенно
+    res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+    if (res->body == NULL) return NULL;
+    int j;                                                          ///счетчик в котором храним то что занимаем на предыдущем шаге
+    for (int i = 0; i < left->bodysize; i++) {
+        res->bodysize++;
+        if (i < right->bodysize) {                                     ///если меньше меньшего, то отнимаем цифры обоих чисел
+            j = left->body[i] - right->body[i];
+        } else                                                          ///иначе в ответ идут цифры большего
+            j = left->body[i];
+        if (i == reall_size - 1) {                                  /// если массив переполнился
+            reall_size *= 2;
+            res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+            if (res->body == NULL) return NULL;
+        }
+        if (j < 0) { /// занимаем у старшего разряда
+            left->body[i + 1]--;
+            j += 10;
+        }
+        res->body[i] = j;
+    }
+    res->bodysize--;
+    while (res->body[res->bodysize - 1] == 0) ///убираем незначащие нули
+        res->bodysize--;
+
+    return res;
+}
+
+bn* bn_add(bn const *left, bn const *right){
+    if (left == NULL || right == NULL) return NULL;
+    if (left->sign==right->sign){
+            return bn_add_sign(left,right);
+    }
+    else{
+        int k = bn_cmp_abs(left,right);
+        if (k==1)
+            return bn_sub_sign(left,right);
+        else if (k==0)
+            return bn_new();
+        else
+            return bn_sub_sign(right,left);
+    }
+}
+/// Инициализировать значение BN представлением строки в системе счисления radix
+int bn_init_string_radix(bn *t, const char *init_string, int radix){
 if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;
 char a = init_string[0];
 int i =0;
@@ -232,21 +312,32 @@ if (a=='-') {t->sign=-1;i =1;}
 else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
 while (a){
     a=init_string[i];
+    int k;
     if (a=='\0') break;
-    int k=0;
-    for (k;k<32;k++){ /// находим номер цифры в строке p
-        if (numeral_sys[k]==a) break;
-    }
-    int p = bn_mul_small(sum,radix);
-    if (p) return p;
+    if (a >= '0' && a <= '9')
+        k = a - '0';
+    else
+        k= a - 'A' + 10;
+    bn_mul_small(sum,radix);
     bn *g = bn_new();
-    p= bn_init_int(g,k);
-    if (p) return p;
-    sum = bn_add_sign(sum,g);
+    bn_init_int(g,k);
+    bn *res = bn_add_sign(sum,g);
+    bn_delete(sum);
+    sum=bn_init(res);
+    bn_delete(res);
     bn_delete(g);
     i++;
 }
-t = bn_init(sum);
-int p =bn_delete(sum);
-return p;
+t->sign=sum->sign;
+t->bodysize=sum->bodysize;
+t->body=realloc(t->body,sizeof(int) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=sum->body[i];
+    }
+bn_delete(sum);
+return BN_OK;
 }
