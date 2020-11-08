@@ -28,3 +28,4 @@ bn* bn_sub_sign(bn const *left, bn const *right); // Вычитание одно
 int bn_delete(bn *t); // отчистить память
 bn* bn_add(bn const *left, bn const *right);// Сложение BN
 bn* bn_sub(bn const *left, bn const *right); //разность BN
+bn* bn_mul(bn const *left, bn const *right); // Произведение BN

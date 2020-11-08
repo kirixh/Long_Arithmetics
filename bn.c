@@ -316,6 +316,27 @@ bn* bn_sub(bn const *left, bn const *right){
         return res;
     }
 }
+
+bn* bn_mul(bn const *left, bn const *right){
+    if (left==NULL|| right==NULL) return NULL;
+    if (left->sign == 0 || right->sign==0) return bn_new(); ///Если один множитель 0 то все произведение 0
+    bn *res = bn_new();
+    bn *right_cp_10=bn_init(right); ///Здесь хранится копия правого числа, которая умножается на 10 каждый раз кроме 1 итерации
+    res->sign = left->sign * right->sign;
+    for (int i=0;i<left->bodysize;i++){
+        if (i>0) bn_mul_small(right_cp_10,10);
+        bn *right_cp=bn_init(right_cp_10); /// Временная копия, которая нужна для операций чтобы не менять исходное число
+        bn_mul_small(right_cp,left->body[i]);
+        bn *tmp = bn_add_sign(res,right_cp); /// Переменная для замены значения res
+        bn_delete(res);
+        bn_delete(right_cp);
+        res = bn_init(tmp);
+        bn_delete(tmp);
+    }
+    bn_delete(right_cp_10);
+    return res;
+}
+
 /// Инициализировать значение BN представлением строки в системе счисления radix
 int bn_init_string_radix(bn *t, const char *init_string, int radix){
 if (t==NULL || init_string==NULL || init_string[0]=='\0') return BN_NULL_OBJECT;

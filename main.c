@@ -1,7 +1,7 @@
 //#include "bn.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+//#include <string.h>
 //#include <time.h>
 struct bn_s {
     int *body;
@@ -27,7 +27,7 @@ bn *bn_new(){
     return r;
 }
 
-/*int bn_init_int(bn *t, int init_int){
+int bn_init_int(bn *t, int init_int){
     if (t==NULL) return BN_NULL_OBJECT;
     if (init_int==0){ ///если 0 то всё BN=0
         t->bodysize=1;
@@ -51,7 +51,7 @@ bn *bn_new(){
     t->bodysize=len;
     return BN_OK;
 
-}*/
+}
 
 bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одного знака
     if (left == NULL || right == NULL) return NULL;
@@ -130,7 +130,7 @@ void bn_print(bn const *num){
     }
     putchar('\n');
 }
-
+///Фибоначчи
 /*int main() {
     int n;
     scanf("%d",&n);
@@ -282,6 +282,61 @@ bn* bn_sub(bn const *left, bn const *right){
         return res;
     }
 }
+int bn_mul_small (bn *t, const int n){
+    if (t==NULL) return BN_NULL_OBJECT;
+    if (n==0) { ///Если n=0 то bn=0
+        t->bodysize=1;
+        t->sign=0;
+        t->body[0]=0;
+        return BN_OK;
+    }
+    int buff =0; /// будем хранить остаток
+    int j;
+    for (int i = 0;i<t->bodysize;i++){
+        j=t->body[i]*n;
+        t->body[i]=(buff + j)%10;
+        buff = (buff+j)/10;
+    }
+    if (buff){
+        int reall_size=4; /// для того чтобы дозаказывать память постепенно
+        t->body=realloc(t->body,(reall_size+t->bodysize) * sizeof(int)); ///дозаказываем память
+        if (t->body == NULL) return BN_NO_MEMORY;
+        int i = 1;
+        while(buff){ ///если длина произведения больше чем у t
+            if (i==reall_size){
+                reall_size*=2;
+                i=1;
+                t->body=realloc(t->body,(reall_size+t->bodysize)*sizeof(int)); ///дозаказываем память
+                if (t->body == NULL) return BN_NO_MEMORY;
+            }
+            t->body[t->bodysize]=buff%10;
+            t->bodysize++;
+            buff/=10;
+            i++;
+        }
+    }
+    return BN_OK;
+}
+
+bn* bn_mul(bn const *left, bn const *right){
+    if (left==NULL|| right==NULL) return NULL;
+    if (left->sign == 0 || right->sign==0) return bn_new(); ///Если один множитель 0 то все произведение 0
+    bn *res = bn_new();
+    bn *right_cp_10=bn_init(right); ///Здесь хранится копия правого числа, которая умножается на 10 каждый раз кроме 1 итерации
+    res->sign = left->sign * right->sign;
+    for (int i=0;i<left->bodysize;i++){
+        if (i>0) bn_mul_small(right_cp_10,10);
+        bn *right_cp=bn_init(right_cp_10); /// Временная копия, которая нужна для операций чтобы не менять исходное число
+        bn_mul_small(right_cp,left->body[i]);
+        bn *tmp = bn_add_sign(res,right_cp); /// Переменная для замены значения res
+        bn_delete(res);
+        bn_delete(right_cp);
+        res = bn_init(tmp);
+        bn_delete(tmp);
+    }
+    bn_delete(right_cp_10);
+    return res;
+}
 
 char *getstring(int *len){
     *len=0;
@@ -299,7 +354,7 @@ char *getstring(int *len){
     init_string1[*len]='\0';
     return init_string1;
 }
-int main(){ ///Длинное слож/вычитание
+/*int main(){ ///Длинное слож/вычитание
     int len;
     char *init_string1=getstring(&len);
     char *oper=getstring(&len);
@@ -324,15 +379,37 @@ int main(){ ///Длинное слож/вычитание
     free (init_string2);
     return 0;
 }
+*/
+
+int main(){ ///Длинное умножение
+    int len;
+    char *init_string1=getstring(&len);
+    char *oper=getstring(&len);
+    char *init_string2=getstring(&len);
+    bn *a=bn_new();
+    bn *b=bn_new();
+    bn_init_string(a,init_string1);
+    bn_init_string(b,init_string2);
+    bn *c= bn_mul(a,b);
+    bn_print(c);
+    bn_delete(c);
+    bn_delete(a);
+    bn_delete(b);
+    free (init_string1);
+    free (oper);
+    free (init_string2);
+    return 0;
+}
 
 
-/*int main(){
+/*
+int main(){
     bn *a = bn_new();
     bn *b = bn_new();
     //bn *c = bn_new();
-    //printf("%d ", 7%10);
-    bn_init_string(a,"0");
-    //char* init_string = "SUKABLYATNAHUI";
+    //printf("%d ", 1^-1);
+    bn_init_string(a,"-1");
+    //char* init_string = "FFFFFFFZKSQE";
     int code = bn_init_int(b,1);
     //bn *c=bn_init(b);
     //int code = bn_init_string(a,init_string);
@@ -345,7 +422,7 @@ int main(){ ///Длинное слож/вычитание
     //bn_print(c);
     bn_print(b);
     printf("сравнили %d \n",bn_cmp_abs(a,b));
-    bn *c = bn_sub(a,b);
+    bn *c = bn_mul(a,b);
     bn_print(c);
     //code = bn_cmp(a,b);
     printf("cmp ret %d \n",code);
