@@ -1,29 +1,28 @@
-//#include "bn.h"
+#include "bn.h"
 #include <stdio.h>
 #include <stdlib.h>
 //#include <string.h>
 //#include <time.h>
-
-struct bn_s;
+/*struct bn_s;
 typedef struct bn_s bn;
 enum bn_codes {
     BN_OK, BN_NULL_OBJECT, BN_NO_MEMORY, BN_DIVIDE_BY_ZERO
 };
 struct bn_s {
-    int *body;
+    long long int *body;
     int bodysize;
     int sign;
 };
-//
-// Created by kika on 23.10.2020.
-//
+typedef long long ll;
+const int base = 1000000000;
+const int digits=9;
 //Создать новое BN
 bn *bn_new(){
     bn *r = malloc(sizeof(bn));
     if (r== NULL) return NULL;
     r->bodysize =1;
     r->sign = 0;
-    r->body = malloc(sizeof(int)* r->bodysize);
+    r->body = malloc(sizeof(ll)* r->bodysize);
     if (r->body == NULL){
         free(r);
         return NULL;
@@ -37,7 +36,7 @@ bn *bn_init(bn const *orig){
     if (r==NULL) return NULL;
     r->bodysize=orig->bodysize;
     r->sign=orig->sign;
-    r->body=malloc(sizeof(int) * r->bodysize);
+    r->body=malloc(sizeof(ll) * r->bodysize);
     if (r->body == NULL){
         free(r);
         return NULL;
@@ -56,8 +55,9 @@ int bn_delete(bn *t){
 //Вывести на экран значение BN
 void bn_print(bn const *num){
     if (num->sign == -1) putchar('-');
-    for(int i=num->bodysize-1; i>=0;i--){
-        putchar(num->body[i]+48);
+    printf("%lld",num->body[num->bodysize-1]);
+    for(int i=num->bodysize-2; i>=0;i--){
+        printf("%.9lld",num->body[i]);
     }
     putchar('\n');
 }
@@ -71,23 +71,17 @@ int bn_init_string(bn *t, const char *init_string){
     else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
     else {t->sign = 1;}
     while (a){a=init_string[len+1];len++;} ///Считаем длину числа
-    int i =0;
-    if (flag) {i =1;len--;} /// если отрицательное
-    t->bodysize = len;
-    t->body = realloc(t->body,(len) * sizeof(int)); ///закаываем память
+    if (flag) {len--;} /// если отрицательное
+    t->bodysize = (len-1)/digits+1;
+    t->body = realloc(t->body,t->bodysize * sizeof(ll)); ///заказываем память
     if (t->body == NULL) return BN_NO_MEMORY;
-    while(i<len+flag){
-        a = init_string[i];
-        t->body[i-flag] = a - 48;
-        i++;
-    }
-    int tmp;
-    i=len/2; /// используем старую переменную
-    for(int j=0;j<i;j++){ ///меняем местами цифры, так как они записаны в прямом порядке
-        tmp=t->body[len-1];
-        t->body[len-1]=t->body[j];
-        t->body[j]=tmp;
-        len--;
+    for (int i=0;i<t->bodysize;i++){        ///вычисляю i-ю цифру числа
+        t->body[i]=0;
+        for (int j=digits;j>0;j--){
+            int pos=len - i*digits - j;     ///позиция с которой записываю цифру в BN_цифру
+            if (pos>=0)
+                t->body[i]=t->body[i]*10 + (init_string[pos+flag]-48);
+        }
     }
     return BN_OK;
 
@@ -103,18 +97,14 @@ int bn_init_int(bn *t, int init_int){
     }
     if (init_int>0) t->sign = 1;
     else {t->sign = -1; init_int*=-1;} /// если отрицательное то привращаем в положительное
-    int a=init_int%10; /// получаем последнюю цифру
-    int len = 1;
-    while (init_int){
-        t->body=realloc(t->body,len*sizeof(int)); ///дозаказываем память
+    t->body[0]=init_int%base;
+    if (init_int>=base){
+        t->body=realloc(t->body,2*sizeof(ll)); ///дозаказываем память
         if (t->body == NULL) return BN_NO_MEMORY;
-        t->body[len-1]=a;
-        init_int/=10;
-        a=init_int%10;
-        len++;
+        t->bodysize++;
+        t->body[1]=(init_int - init_int%base)/base;
+
     }
-    len--; /// len всегда на 1 больше чем длина числа
-    t->bodysize=len;
     return BN_OK;
 
 }
@@ -161,7 +151,7 @@ int bn_cmp_abs(bn const *left, bn const *right){ /// Сравнение по м�
     for (int i=left->bodysize-1;i>=0;i--){
         if (left->body[i] > right->body[i]) return ret;
         if (left->body[i] < right->body[i]) return -ret;
-        }
+    }
     return 0;
 }
 
@@ -173,32 +163,32 @@ int bn_mul_small (bn *t, const int n){
         t->body[0]=0;
         return BN_OK;
     }
-    int buff =0; /// будем хранить остаток
-    int j;
- for (int i = 0;i<t->bodysize;i++){
-     j=t->body[i]*n;
-     t->body[i]=(buff + j)%10;
-     buff = (buff+j)/10;
- }
- if (buff){
-     int reall_size=4; /// для того чтобы дозаказывать память постепенно
-     t->body=realloc(t->body,(reall_size+t->bodysize) * sizeof(int)); ///дозаказываем память
-     if (t->body == NULL) return BN_NO_MEMORY;
-     int i = 1;
-     while(buff){ ///если длина произведения больше чем у t
-         if (i==reall_size){
-             reall_size*=2;
-             i=1;
-             t->body=realloc(t->body,(reall_size+t->bodysize)*sizeof(int)); ///дозаказываем память
-             if (t->body == NULL) return BN_NO_MEMORY;
-         }
-         t->body[t->bodysize]=buff%10;
-         t->bodysize++;
-         buff/=10;
-         i++;
-     }
- }
- return BN_OK;
+    ll buff =0; /// будем хранить остаток
+    ll j;
+    for (int i = 0;i<t->bodysize;i++){
+        j=t->body[i]*n;
+        t->body[i]=(buff + j)%base;
+        buff = (buff+j)/base;
+    }
+    if (buff){
+        int reall_size=2; /// для того чтобы дозаказывать память постепенно
+        t->body=realloc(t->body,(reall_size*t->bodysize) * sizeof(ll)); ///дозаказываем память
+        if (t->body == NULL) return BN_NO_MEMORY;
+        int i = 1;
+        while(buff){ ///если длина произведения больше чем у t
+            if (i==reall_size){
+                reall_size*=2;
+                i=1;
+                t->body=realloc(t->body,(reall_size)*sizeof(ll)); ///дозаказываем память
+                if (t->body == NULL) return BN_NO_MEMORY;
+            }
+            t->body[t->bodysize]=buff%base;
+            t->bodysize++;
+            buff/=base;
+            i++;
+        }
+    }
+    return BN_OK;
 }
 bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одного знака
     if (left == NULL || right == NULL) return NULL;
@@ -214,17 +204,17 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
     }
     else
         res->bodysize=right->bodysize;
-    res->body=realloc(res->body,(res->bodysize+1)*sizeof(int)); ///выделяем память
+    res->body=realloc(res->body,(res->bodysize+1)*sizeof(ll)); ///выделяем память
     if (res->body == NULL) return NULL;
-    int j = 0; ///счетчик в котором будет то что мы "откладываем в уме"
+    ll j = 0; ///счетчик в котором будет то что мы "откладываем в уме"
     if (flag){
         for (int i = 0;i<left->bodysize;i++){
             if (i<right->bodysize) ///если меньше меньшего, то прибаляем цифры обоих чисел
                 j+=left->body[i]+right->body[i];
             else ///иначе только большего
                 j+=left->body[i];
-            res->body[i]=j%10;
-            j/=10;
+            res->body[i]=j%base;
+            j/=base;
         }
         if (j){
             res->body[left->bodysize]=j;
@@ -237,8 +227,8 @@ bn* bn_add_sign(bn const *left, bn const *right){ ///Сложение BN одн�
                 j= j+ left->body[i]+right->body[i];
             else
                 j= j+ right->body[i];
-            res->body[i]=j%10;
-            j/=10;
+            res->body[i]=j%base;
+            j/=base;
         }
         if (j){
             res->body[right->bodysize]=j;
@@ -256,11 +246,11 @@ bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN од
         res->sign = left->sign;
     else
         res->sign = right->sign;
-    int reall_size = 4;                                              /// для того чтобы дозаказывать память постепенно
-    res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+    int reall_size = 2;                                              /// для того чтобы дозаказывать память постепенно
+    res->body = realloc(res->body, reall_size * sizeof(ll)); ///дозаказываем память
     if (res->body == NULL) return NULL;
-    int buff;                                                        /// промежуточное вычисление
-    int j=0;                                                          ///счетчик в котором храним то что занимаем на предыдущем шаге
+    ll buff;                                                        /// промежуточное вычисление
+    ll j=0;                                                          ///счетчик в котором храним то что занимаем на предыдущем шаге
     for (int i = 0; i < left->bodysize; i++) {
         res->bodysize++;
         if (i < right->bodysize) {                                     ///если меньше меньшего, то отнимаем цифры обоих чисел
@@ -272,12 +262,12 @@ bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN од
         }
         if (i == reall_size - 1) {                                  /// если массив переполнился
             reall_size *= 2;
-            res->body = realloc(res->body, reall_size * sizeof(int)); ///дозаказываем память
+            res->body = realloc(res->body, reall_size * sizeof(ll)); ///дозаказываем память
             if (res->body == NULL) return NULL;
         }
         if (buff < 0) { /// занимаем у старшего разряда
             j++;
-            buff += 10;
+            buff += base;
         }
         res->body[i] = buff;
     }
@@ -291,7 +281,7 @@ bn* bn_sub_sign(bn const *left, bn const *right) { ///Вычитание BN од
 bn* bn_add(bn const *left, bn const *right){
     if (left == NULL || right == NULL) return NULL;
     if (left->sign==right->sign){
-            return bn_add_sign(left,right);
+        return bn_add_sign(left,right);
     }
     else{
         int k = bn_cmp_abs(left,right);
@@ -327,15 +317,16 @@ bn* bn_sub(bn const *left, bn const *right){
     }
 }
 
+
 bn* bn_mul(bn const *left, bn const *right){
     if (left==NULL|| right==NULL) return NULL;
     if (left->sign == 0 || right->sign==0) return bn_new(); ///Если один множитель 0 то все произведение 0
     bn *res = bn_new();
-    bn *right_cp_10=bn_init(right); ///Здесь хранится копия правого числа, которая умножается на 10 каждый раз кроме 1 итерации
+    bn *right_cp_base=bn_init(right); ///Здесь хранится копия правого числа, которая умножается на 10 каждый раз кроме 1 итерации
     res->sign = left->sign * right->sign;
     for (int i=0;i<left->bodysize;i++){
-        if (i>0) bn_mul_small(right_cp_10,10);
-        bn *right_cp=bn_init(right_cp_10); /// Временная копия, которая нужна для операций чтобы не менять исходное число
+        if (i>0) bn_mul_small(right_cp_base,base);
+        bn *right_cp=bn_init(right_cp_base); /// Временная копия, которая нужна для операций чтобы не менять исходное число
         bn_mul_small(right_cp,left->body[i]);
         bn *tmp = bn_add_sign(res,right_cp); /// Переменная для замены значения res
         bn_delete(res);
@@ -343,7 +334,7 @@ bn* bn_mul(bn const *left, bn const *right){
         res = bn_init(tmp);
         bn_delete(tmp);
     }
-    bn_delete(right_cp_10);
+    bn_delete(right_cp_base);
     return res;
 }
 
@@ -353,7 +344,60 @@ int bn_add_to(bn *t, bn const *right){
     bn *tmp = bn_add_sign(t,right);
     t->sign=tmp->sign;
     t->bodysize=tmp->bodysize;
-    t->body=realloc(t->body,sizeof(int) * t->bodysize);
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
+}
+
+int bn_sub_to(bn *t, bn const *right){
+    if (t==NULL || right == NULL)
+        return BN_NULL_OBJECT;
+    bn *tmp = bn_sub(t,right);
+    t->sign=tmp->sign;
+    t->bodysize=tmp->bodysize;
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
+}
+
+int bn_sub_to_no_realloc(bn *t, bn const *right){                     ///вспомогательная функция для деления
+    if (t==NULL || right == NULL)
+        return BN_NULL_OBJECT;
+    bn *tmp = bn_sub(t,right);
+    t->sign=tmp->sign;
+    t->bodysize=tmp->bodysize;
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
+}
+
+int bn_mul_to(bn *t, bn const *right){
+    if (t==NULL || right == NULL)
+        return BN_NULL_OBJECT;
+    bn *tmp = bn_mul(t,right);
+    t->sign=tmp->sign;
+    t->bodysize=tmp->bodysize;
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
     if (t->body == NULL){
         free(t);
         return BN_NO_MEMORY;
@@ -371,9 +415,9 @@ int bn_div_small(bn *t, const int n){
         return BN_DIVIDE_BY_ZERO;
     }
     if (n<0) t->sign*=-1;
-    int buff =0; /// будем хранить остаток
+    ll buff =0; /// будем хранить остаток
     for (int i=t->bodysize-1;i>=0;i--){
-        buff = buff*10 + t->body[i];
+        buff = buff*base + t->body[i];
         t->body[i]=buff/n;
         buff%=n;
     }
@@ -382,91 +426,292 @@ int bn_div_small(bn *t, const int n){
             break;
         t->bodysize--;
     }
+    if (t->body[t->bodysize-1]==0) t->sign=0;
     return BN_OK;
 }
 
-bn* bn_div(bn const *left, bn const *right){
-    if (left==NULL || right==NULL) return NULL;
+int bn_mod_small(bn *t, const int n){
+    if (t==NULL) return BN_NULL_OBJECT;
+    if (n==0) { ///Если n=0 то bn=0
+        return BN_DIVIDE_BY_ZERO;
+    }
+    if (n<0) t->sign*=-1;
+    ll buff =0; /// будем хранить остаток
+    for (int i=t->bodysize-1;i>=0;i--){
+        buff = buff*base + t->body[i];
+        t->body[i]=buff/n;
+        buff%=n;
+    }
+    bn *tmp=bn_new();
+    bn_init_int(tmp,buff);
+    if (buff==0) t->sign=0;
+    t->bodysize=tmp->bodysize;
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
+}
+
+
+bn* bn_div(bn const *left, bn const *right) {
+    if (left == NULL || right == NULL) return NULL;
     if (right->sign == 0) return NULL;
-    if (right->bodysize==1 && right->body[0]==1){      ///При делении на 1 бин поиск циклиться
-        bn *m=bn_init(left);
-        m->sign=left->sign * right->sign;
+    if (right->bodysize == 1 && right->body[0] == 1) {      ///При делении на 1 алгоритм циклится
+        bn *m = bn_init(left);
+        m->sign = left->sign * right->sign;
         return m;
     }
-    if (bn_cmp_abs(left,right)==-1) return bn_new();  ///если модуль делителя больше делимого то 0
-    bn *right1 = bn_init(right);
-    bn_abs(right1);                                 ///создаю копии входных данных, так как с отрицательными я работаю так же, как и с положительными
-    bn *left1 = bn_init(left);
-    bn_abs(left1);
-    bn *r=bn_init(left1);                           /// l и r границы бин поиска
-    bn *l=bn_new();
-    bn_init_int(l,1);
-    int p;
-    ///пока разность между (произведением ответа и делителя) и делимым не станет меньше чем делимое
-    while (1){
-        bn *m = bn_add(l,r);
-        bn_div_small(m,2);                ///нахожу середину
-        bn *tmp =bn_mul(m,right1);
-        p=bn_cmp(tmp,left1);                ///сравниваю с делимым
-        bn *diff = bn_sub(left1,tmp);       ///разность нужна для выхода из цикла
-        /*printf("l= ");
-        bn_print(l);
-        printf("r= ");
-        bn_print(r);
-        printf("m= ");
-        bn_print(m);
-        printf("p= %d",p);
-        printf("\n\n");*/
-if (p>0){               ///если ответ больше чем делимое, то правую границу уменьшаю
-bn_delete(r);
-r=bn_init(m);
-bn_delete(m);
-bn_delete(tmp);
-bn_delete(diff);
+    if (bn_cmp_abs(left, right) == -1) return bn_new();  ///если модуль делителя больше делимого то 0
+    bn *res = bn_new();
+    res->body = realloc(res->body, left->bodysize*sizeof(ll));
+    res->bodysize=0;
+    bn *current = bn_new();
+    current->body = realloc(current->body, (left->bodysize+1)*sizeof(ll)); ///буду хранить текущее, от чего вычитаю
+    int k=0;
+    for (int i = left->bodysize-1; i>= 0; i--) {
+        if (i-k<0){break;}                                           ///если закончились разряды
+        current->sign=1;
+        k--;
+        int flag=-1;
+        while (bn_cmp_abs(current,right)==-1){                         ///записываем в current пока оно меньше чем right
+            k++;
+            if (i-k<0){
+                if (flag!=-1)                                   /// если добавляли нули в ответ, то bodysize на 1 больше чем нужно
+                    res->bodysize--;
+                break;}
+            if (k>=1 || current->bodysize>=2) {                                ///из-за обратного хранения сдвигаем все цифры вправо и записываем в начало
+                for (int j = current->bodysize; j > 0; j--) {
+                    current->body[j]=current->body[j-1];
+                }
+            }
+            ///если в left есть цифры
+
+                current->body[0] = left->body[i-k];
+                if (k!=0 && current->body[current->bodysize]!=0)
+                    current->bodysize++;
+                else if (k!=0){                               ///если первая цифра в current постоянно 0, то дописываем нули в ответ
+                    flag++;
+                    res->body[left->bodysize-i-1+flag] = 0;
+                    res->bodysize++;
+                }
+        }
+        ll l = 0;
+        ll r = base;
+        ll g = 0;
+        while (l <= r) {
+            ll m = (l + r) / 2;
+            bn *t = bn_init(right);
+            bn_abs(t);
+            bn_mul_small(t, m);
+            if (bn_cmp_abs(t,current)<1) {   ///если t<= current
+                g = m;
+                l = m + 1;
+            }
+            else r = m - 1;
+            bn_delete(t);
+        }
+        res->body[left->bodysize-i-1] = g;
+        res->bodysize++;
+        bn *t=bn_init(right);
+        bn_abs(t);
+        bn_mul_small(t,g);
+        bn_sub_to_no_realloc(current,t);           ///так как мы уже выделили под current left->bodysize + 1 ячейку
+        bn_delete(t);
+    }
+    bn_delete(current);
+    res->sign=left->sign*right->sign;
+    ll tmp;
+    ll o=res->bodysize/2;
+    for(int j=0;j<o;j++){ ///меняем местами цифры, так как они записаны в прямом порядке
+        tmp=res->body[res->bodysize-1-j];
+        res->body[res->bodysize-1-j]=res->body[j];
+        res->body[j]=tmp;
+
+    }
+    while(res->body[res->bodysize-1]==0)          ///избавляюсь от незначащих нулей
+        res->bodysize--;
+    if (res->sign==-1){
+        bn *y=bn_new();
+        bn_init_int(y,-1);
+        bn_add_to(res,y);
+        bn_delete(y);
+    }
+    return res;
 }
-else if (bn_cmp(diff,right1)<1) {  ///если разность меньше или равна делителю то число найдено
-bn_delete(r);
-bn_delete(l);
-bn_delete(tmp);
-bn_delete(diff);
-bn_delete(left1);
-bn_delete(right1);
-m->sign=right->sign*left->sign;
-return m;
+
+bn* bn_mod(bn const *left, bn const *right){
+    if (left == NULL || right == NULL) return NULL;
+    if (right->sign == 0) return NULL;
+    if (right->bodysize == 1 && right->body[0] == 1) {      ///При делении на 1 алгоритм циклится
+        bn *m = bn_init(left);
+        m->sign = left->sign * right->sign;
+        return m;
+    }
+    if (bn_cmp_abs(left, right) == -1){bn *tmp =bn_init(left); tmp->sign=right->sign; return tmp;}  ///если модуль делителя больше делимого то остаток само число
+    bn *res = bn_new();
+    res->body = realloc(res->body, left->bodysize*sizeof(ll));
+    res->bodysize=0;
+    bn *current = bn_new();
+    current->body = realloc(current->body, (left->bodysize+1)*sizeof(ll)); ///буду хранить текущее, от чего вычитаю
+    int k=0;
+    for (int i = left->bodysize-1; i>= 0; i--) {
+        if (i-k<0){break;}                                           ///если закончились разряды
+        current->sign=1;
+        k--;
+        int flag=-1;
+        while (bn_cmp_abs(current,right)==-1){                         ///записываем в current пока оно меньше чем right
+            k++;
+            if (i-k<0){
+                if (flag!=-1)                                   /// если добавляли нули в ответ, то bodysize на 1 больше чем нужно
+                    res->bodysize--;
+                break;}
+            if (k>=1 || current->bodysize>=2) {                                ///из-за обратного хранения сдвигаем все цифры вправо и записываем в начало
+                for (int j = current->bodysize; j > 0; j--) {
+                    current->body[j]=current->body[j-1];
+                }
+            }
+            ///если в left есть цифры
+
+            current->body[0] = left->body[i-k];
+            if (k!=0 && current->body[current->bodysize]!=0)
+                current->bodysize++;
+            else if (k!=0){                               ///если первая цифра в current постоянно 0, то дописываем нули в ответ
+                flag++;
+                res->body[left->bodysize-i-1+flag] = 0;
+                res->bodysize++;
+            }
+        }
+        ll l = 0;
+        ll r = base;
+        ll g = 0;
+        while (l <= r) {
+            ll m = (l + r) / 2;
+            bn *t = bn_init(right);
+            bn_abs(t);
+            bn_mul_small(t, m);
+            if (bn_cmp_abs(t,current)<1) {   ///если t<= current
+                g = m;
+                l = m + 1;
+            }
+            else r = m - 1;
+            bn_delete(t);
+        }
+        res->body[left->bodysize-i-1] = g;
+        res->bodysize++;
+        bn *t=bn_init(right);
+        bn_abs(t);
+        bn_mul_small(t,g);
+        bn_sub_to_no_realloc(current,t);           ///так как мы уже выделили под current left->bodysize + 1 ячейку
+        bn_delete(t);
+    }
+    bn_delete(res);
+    if (current->sign!=0) current->sign=right->sign;
+    if (left->sign*right->sign==-1){
+        bn *cp_current=bn_sub(right,current);
+        bn_delete(current);
+        current=bn_init(cp_current);
+        bn_delete(cp_current);
+    }
+    return current;
 }
-else{                          ///иначе увеличиваю левую границу
-bn_delete(l);
-l=bn_init(m);
-bn_delete(m);
-bn_delete(tmp);
-bn_delete(diff);
+
+int bn_div_to(bn *t, bn const *right){
+    if (t==NULL || right == NULL)
+        return BN_NULL_OBJECT;
+    bn *tmp = bn_div(t,right);
+    t->sign=tmp->sign;
+    t->bodysize=tmp->bodysize;
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
 }
+
+int bn_mod_to(bn *t, bn const *right){
+    if (t==NULL || right == NULL)
+        return BN_NULL_OBJECT;
+    bn *tmp = bn_mod(t,right);
+    t->sign=tmp->sign;
+    t->bodysize=tmp->bodysize;
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
+    }
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=tmp->body[i];
+    }
+    bn_delete(tmp);
+    return BN_OK;
 }
-}
-int bn_pow_to(bn *t, int degree) {
+
+int bn_pow_to(bn *t, int degree) {            ///метод быстрого возведения в степень
     if (t == NULL) return BN_NULL_OBJECT;
-    if (degree < 0) {
+    if (degree < 0) {                       ///если степень отрицательная то 1
         t->sign=0;
         t->bodysize=1;
         t->body[0]=1;
         return BN_OK;
     }
-    bn *cp_t = bn_init(t);
-    for (int i = 0; i < degree-1; i++) {
-        bn *tmp = bn_mul(t, cp_t);
-        t->sign=tmp->sign;
-        t->bodysize=tmp->bodysize;
-        t->body=realloc(t->body,sizeof(int) * t->bodysize);
-        if (t->body == NULL){
-            free(t);
-            return BN_NO_MEMORY;
+    bn *ans=bn_new();
+    bn_init_int(ans,1);
+    while(degree){
+        if (degree%2==0){           ///если четная, то умножаем степени исходного t
+            degree/=2;
+            bn *cp_t = bn_init(t);
+            bn *tmp = bn_mul(t, cp_t);  ///код ниже копирует в t из tmp
+            t->sign=tmp->sign;
+            t->bodysize=tmp->bodysize;
+            t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+            if (t->body == NULL){
+                free(t);
+                return BN_NO_MEMORY;
+            }
+            for (int i=0;i<t->bodysize;i++){
+                t->body[i]=tmp->body[i];
+            }
+            bn_delete(tmp);
+            bn_delete(cp_t);
         }
-        for (int i=0;i<t->bodysize;i++){
-            t->body[i]=tmp->body[i];
+        else{                                               ///если степень нечетная, то умножаем просто на степень исходного t
+           degree--;
+            bn *tmp = bn_mul(ans, t);
+            ans->sign=tmp->sign;
+            ans->bodysize=tmp->bodysize;
+            ans->body=realloc(ans->body,sizeof(ll) * ans->bodysize);
+            if (ans->body == NULL){
+                free(ans);
+                return BN_NO_MEMORY;
+            }
+            for (int i=0;i<ans->bodysize;i++){
+                ans->body[i]=tmp->body[i];
+            }
+            bn_delete(tmp);
+
         }
-        bn_delete(tmp);
+    }                                                                       ///копируем из ans в t
+    t->sign=ans->sign;
+    t->bodysize=ans->bodysize;
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
+    if (t->body == NULL){
+        free(t);
+        return BN_NO_MEMORY;
     }
-    bn_delete(cp_t);
+    for (int i=0;i<t->bodysize;i++){
+        t->body[i]=ans->body[i];
+    }
+    bn_delete(ans);
     return BN_OK;
 }
 
@@ -485,71 +730,51 @@ int bn_root_to(bn *t, int reciprocal){
     }
     if (t->bodysize==1 && (t->sign==0 || (t->body[0]==1)))       ///если 0, 1, -1
         return BN_OK;
-    bn *r=bn_init(t);                           /// l и r границы бин поиска
-    bn_abs(r);
     bn *l=bn_new();
+    bn_init_int(l,2);
+    bn_pow_to(l,15*t->bodysize);
+    int sign=t->sign;
+    bn_abs(t);
     int p;
-    ///пока разность между (произведением ответа и делителя) и делимым не станет меньше чем делимое
+    int flag=0;
+    ///формула Ньютона
     while (1){
-        bn *m = bn_add(l,r);
-        bn_div_small(m,2);                ///нахожу середину
-        bn *m1=bn_init(m);
-        bn *m1_1=bn_init(m);
-        bn *tmp=bn_new();
-        if (t->sign==1)
-            bn_init_int(tmp,1);
-        else
-            bn_init_int(tmp,-1);
-        bn_add_to(m1_1,tmp);
-        bn_delete(tmp);
-        bn_pow_to(m1,reciprocal);
-        bn_pow_to(m1_1,reciprocal);
-        p=bn_cmp_abs(m1,t);
-        int diff=bn_cmp_abs(m1_1,t);
-        /*
-        printf("l= ");
-        bn_print(l);
-        printf("r= ");
-        bn_print(r);
-        printf("m= ");
-        bn_print(m);
-        printf("p= %d\n",p);
-        printf("m1= ");
-        bn_print(m1);
-        printf("m1_1= ");
-        bn_print(m1_1);
-        printf("\n\n");
-        */
-        bn_delete(m1);
-        bn_delete(m1_1);
-        if (p>0){               ///если ответ больше чем делимое, то правую границу уменьшаю
-            bn_delete(r);
-            r=bn_init(m);
-            bn_delete(m);
-        }
-        else if (diff==1) {  ///если разность меньше или равна делителю то число найдено
-            bn_delete(r);
-            bn_delete(l);
-            t->bodysize=m->bodysize;
-            t->body=realloc(t->body,sizeof(int) * t->bodysize);
+        bn *l_cp1=bn_init(l);
+        bn *l_cp2=bn_init(l);
+        bn_mul_small(l_cp1,reciprocal-1);
+        bn_pow_to(l_cp2,reciprocal-1);
+        bn *tmp=bn_div(t,l_cp2);
+        bn *lnext=bn_add(l_cp1,tmp);
+        bn_div_small(lnext,reciprocal);
+        p = bn_cmp_abs(lnext,l);
+        if (p==0 || (p>0 && flag)){                          ///если числа равны, либо предыдущее было меньше, а сейчас стало увеличиваться, то выход
+            t->sign=sign;
+            t->bodysize=lnext->bodysize;
+            t->body=realloc(t->body,sizeof(ll) * t->bodysize);
             if (t->body == NULL){
                 free(t);
                 return BN_NO_MEMORY;
             }
             for (int i=0;i<t->bodysize;i++){
-                t->body[i]=m->body[i];
+                t->body[i]=lnext->body[i];
             }
-            bn_delete(m);
-            return BN_OK;
-        }
-        else{                          ///иначе увеличиваю левую границу
+            bn_delete(lnext);
             bn_delete(l);
-            l=bn_init(m);
-            bn_delete(m);
+            bn_delete(l_cp2);
+            bn_delete(l_cp1);
+            bn_delete(tmp);
+            break;
         }
+        if (p==-1) flag =1;                                 ///если следующее число меньше, то продолжаем
+        else flag =0;
+        bn_delete(l);
+        l=bn_init(lnext);
+        bn_delete(lnext);
+        bn_delete(l_cp1);
+        bn_delete(l_cp2);
+        bn_delete(tmp);
     }
 }
-
 
 
 /// Инициализировать значение BN представлением строки в системе счисления radix
@@ -560,6 +785,8 @@ int bn_init_string_radix(bn *t, const char *init_string, int radix){
     bn *sum=bn_new();
     if (a=='-') {t->sign=-1;i =1;}
     else if(a=='0'){t->bodysize=1;t->sign=0;t->body[0]=0;return BN_OK;}///если 0 то всё BN=0
+    else
+        t->sign=1;
     while (a){
         a=init_string[i];
         int k;
@@ -578,9 +805,8 @@ int bn_init_string_radix(bn *t, const char *init_string, int radix){
         bn_delete(g);
         i++;
     }
-    t->sign=sum->sign;
     t->bodysize=sum->bodysize;
-    t->body=realloc(t->body,sizeof(int) * t->bodysize);
+    t->body=realloc(t->body,sizeof(ll) * t->bodysize);
     if (t->body == NULL){
         free(t);
         return BN_NO_MEMORY;
@@ -591,7 +817,43 @@ int bn_init_string_radix(bn *t, const char *init_string, int radix){
     bn_delete(sum);
     return BN_OK;
 }
+/// Выдать представление BN в системе счисления radix в виде строки
+const char *bn_to_string(bn const *t, int radix){
+    if (t==NULL) return NULL;
+    char* result_string=(char*)malloc(1);
+    int reall_size =1;
+    int i =0;
+    bn *cp_t=bn_init(t);
+    bn_abs(cp_t);
+    while(cp_t->sign!=0){
+        bn *rest=bn_init(cp_t);
+        bn_mod_small(rest,radix);                                   ///получаем остаток
+        if (i==reall_size){                                         ///если память заполнилась
+            reall_size*=2;
+            result_string=(char *)realloc(result_string,reall_size);
+        }
 
+        result_string[i]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[rest->body[0]]; ///добавляем цифру в строку
+        bn_div_small(cp_t,radix);                                               ///переходим в следующий разряд
+        i++;
+        bn_delete(rest);
+    }
+    if (t->sign==-1){                                                           ///если отрицательное то добавляем - в конец строки
+        if (i==reall_size) result_string=(char *)realloc(result_string,reall_size*=2); ///если память переполнилась
+        result_string[i]='-';
+        i++;
+    }
+        for(int j=0;j<i/2;j++)                                                      ///меняем порядок на обратный
+    {
+        char a=result_string[j];
+        result_string[j]=result_string[i-1-j];
+        result_string[i-1-j]=a;
+    }
+    if (i==reall_size) result_string=(char *)realloc(result_string,reall_size+1); ///если память переполнилась
+    result_string[i]='\000';                                                          ///дописываем нулевой символ в конец строки
+    bn_delete(cp_t);
+    return result_string;
+}
 char *getstring(int *len){
     *len=0;
     int real_num=1;
@@ -607,10 +869,10 @@ char *getstring(int *len){
     }
     init_string1[*len]='\0';
     return init_string1;
-}
-
+}*/
+/*
 ///Фибоначчи
-/*int main() {
+int main() {
     int n;
     scanf("%d",&n);
     bn *a=bn_new();
@@ -620,9 +882,9 @@ char *getstring(int *len){
     bn_init_int(b,1);
     //bn_init_string(b,"12200160415121876738");
     //bn_init_string(a,"19740274219868223167"); //F95=31940434634990099905
-    time_t start,end;
-    volatile long unsigned t;
-    start = time(NULL);
+    //time_t start,end;
+    //volatile long unsigned t;
+    //start = time(NULL);
     for (int i=2;i<n;i++){
         bn_delete(s);
         s = bn_add_sign(a,b);
@@ -631,16 +893,17 @@ char *getstring(int *len){
         bn_delete(a);
         a=bn_init(s);
     }
-    end = time(NULL);
-    printf("Цикл использовал %f секунд.\n", difftime(end, start));
+    //end = time(NULL);
+    //printf("Цикл использовал %f секунд.\n", difftime(end, start));
     bn_print(s);
     bn_delete(a);
     bn_delete(b);
     bn_delete(s);
     return 0;
-}*/
-
-/*int main(){ ///Длинное слож/вычитание
+}
+*/
+/*
+int main(){ ///Длинное слож/вычитание
     int len;
     char *init_string1=getstring(&len);
     char *oper=getstring(&len);
@@ -666,8 +929,8 @@ char *getstring(int *len){
     return 0;
 }
 */
-
-/*int main(){ ///Длинное умножение
+/*
+int main(){ ///Длинное умножение
     int len;
     char *init_string1=getstring(&len);
     char *oper=getstring(&len);
@@ -685,7 +948,8 @@ char *getstring(int *len){
     free (oper);
     free (init_string2);
     return 0;
-}*/
+}
+*/
 /*
 int main(){ ///Длинное деление
     int len;
@@ -706,7 +970,7 @@ int main(){ ///Длинное деление
     free(init_string2);
     return 0;
 }*/
-
+/*
 int main(){ ///Длинный корень
     int len;
     char *init_string1 = getstring(&len);
@@ -718,38 +982,46 @@ int main(){ ///Длинный корень
     free(init_string1);
     return 0;
 }
+*/
 
-/*
 int main(){
     bn *a = bn_new();
     bn *b = bn_new();
     //bn *c = bn_new();
-    //printf("%d ", 0%5);
-    bn_init_string(a,"-1610");
-    //char* init_string = "FFFFFFFZKSQE";
-    int code = bn_init_int(b,7);
+    //printf("%d-истинна \n",17%-10);
+    //bn_init_string(a,"-10");
+    char* init_string = "-2";
+    bn_init_string(a,"99999999999999999999999999999899999999999000000000000000000000000000001");
     //bn *c=bn_init(b);
+    //bn_init_string(a,"6");
+    //bn_init_string(b,"-3");
     //int code = bn_init_string(a,init_string);
-    //code = bn_init_int(b,0);
+    bn_init_string(b,"999999999999999999999999999999");
+    ///bn_print(a);
+    ///bn_print(b);
+    bn_div_to(a,b);
+    //bn_pow_to(a,1000);
     //bn_init_string_radix(a,init_string,36);
     bn_print(a);
     //bn_cmp(b,a);
-    //bn_pow_to(a,5);
-    bn_root_to(a,2);
+    //bn_pow_to(a,2);
+    //bn_root_to(a,3);
+    //bn *c =bn_mod(a,b);
+    //const char *string=bn_to_string(a,36);
     //bn *c =bn_div(a,b);
-    //bn_print(b);
-    //code = bn_mul_small(a,13);
-    bn_print(a);
-    //bn *c = bn_add_sign(b,a);
+    //printf("%s",string);
+    //bn_mul_small(a,13);
+    //bn_print(a);
+    //bn *c = bn_sub(a,b);
     //bn_print(c);
-    printf("сравнили %d \n",bn_cmp(b,a));
+    //printf("сравнили %d \n",bn_cmp(b,a));
     //bn *c = bn_mul(a,b);
     //bn_print(c);
     //code = bn_cmp(a,b);
-    printf("cmp ret %d \n",code);
+    //printf("cmp ret %d \n",code);
     bn_delete(a);
     bn_delete(b);
+    //free(string);
     //bn_delete(c);
     return 0;
 }
-*/
